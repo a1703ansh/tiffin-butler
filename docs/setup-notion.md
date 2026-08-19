@@ -78,7 +78,7 @@ Create exactly these properties (name matters — the code auto-detects them):
 |---|---|---|
 | `Summary` | Title (this is the default first column — rename it) | Human author fills `Customer — items` e.g. `Priya — 2× Idli set + 1× Dosa` |
 | `Status` | Select | `New`, `Draft`, `Pending Approval`, `Needs Human`, `Confirmed`, `Rejected`, `Action Failed` |
-| `Customer` | Text | Customer's name |
+| `Customer` | Text |    |
 | `Phone` | Text | Mobile number |
 | `Items` | Text | Readable line items, e.g. `2× Idli set (₹40) · 1× Dosa (₹60)` |
 | `Total` | Number | Format: **Currency ₹** |

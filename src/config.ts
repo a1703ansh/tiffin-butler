@@ -8,7 +8,7 @@ export const env = {
 
   llmApiKey: process.env.LLM_API_KEY ?? "",
   llmBaseUrl: process.env.LLM_BASE_URL ?? "https://api.groq.com/openai/v1",
-  llmModel: process.env.LLM_MODEL ?? "llama-3.3-70b-versatile",
+  llmModel: process.env.LLM_MODEL ?? "openai/gpt-oss-120b",
 
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   emailFrom: process.env.EMAIL_FROM ?? "Tiffin Butler <onboarding@resend.dev>",

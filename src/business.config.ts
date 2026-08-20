@@ -17,7 +17,7 @@ export const business = {
     { name: "Idli set", aliases: ["idli", "idli set", "idlis", "idly", "idli sambar"], price: 40 },
     { name: "Dosa", aliases: ["dosa", "dose", "plain dosa", "masala dosa"], price: 60 },
     { name: "Curd rice", aliases: ["curd rice", "thayir sadam", "curd"], price: 50 },
-    { name: "Chapati set", aliases: ["chapati set", "chapati", "chapatis", "roti set", "3 chappati"], price: 70 },
+    { name: "Chapati set", aliases: ["chapati set", "chapati", "chapatis", "chappati", "chappati set", "chappatis", "roti set", "3 chappati"], price: 70 },
     { name: "Dal rice", aliases: ["dal rice", "rice dal", "dal + rice", "lemon rice"], price: 80 },
     { name: "Full meals", aliases: ["full meals", "meals", "thali", "south indian meals"], price: 100 },
     { name: "Veg fried rice", aliases: ["fried rice", "veg fried rice"], price: 90 },

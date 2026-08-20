@@ -1,0 +1,106 @@
+# Demo Script — 5 minutes for the judges
+
+Tiffin Butler: *“WhatsApp orders, parsed by AI, approved by you.”*
+
+Everything below works headless — the system has been running since Day 1 with
+Run Log rows written by code only.
+
+---
+
+## Before the demo (2 minutes of prep)
+
+- Open two tabs: the **Tiffin Butler** Notion workspace and your email inbox
+  (thakur71039@gmail.com). Keep the Run Log database open and sorted by
+  Timestamp descending.
+- Have [tiffin-butler.onrender.com](https://tiffin-butler.onrender.com) ready
+  (`/` shows the service JSON page — written by code, not a clickup form).
+- Optionally paste two messages into the **Inbox** now so the first minute of
+  the demo shows the cron intake happening live.
+
+## The demo
+
+### 1. The problem (30s)
+Point at a real WhatsApp message on your phone (or paste one):
+> “yes ek curd rice + 2 chappati set kal lunch room 310 this is revati”
+
+Nobody wants to type that into a spreadsheet. Swiggy/Zomato don't serve tiffin
+services. Today that message is read by a human and retyped.
+
+### 2. The intake (60s)
+Paste the message as a new line in **Inbox** (or call the webhook with curl —
+faster):
+```bash
+curl -X POST https://tiffin-butler.onrender.com/webhook/order \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"yes ek curd rice + 2 chappati set kal lunch room 310 this is revati"}'
+```
+Show what code just did in Notion:
+- a new **Orders** row, Status **Pending Approval**, priced:
+  `1× Curd rice (₹50) · 2× Chapati set (₹70) = ₹120` with the right delivery
+  date, room, customer, and a Run Log `success` row beside it.
+
+Message: *AI did the parsing, rules did the pricing, and it paused for a human
+— that's the whole point.*
+
+### 3. The human decision in Notion (30s)
+In the **Needs You** view (filters Pending Approval / Needs Human / Action
+Failed), drag the order to **Confirmed**.
+
+### 4. The real action happens outside Notion (60s)
+Stay in the email tab. Within a minute (cron-job.org → `/cron/process`), the
+confirmation email lands — with a **PDF receipt** attached. Show it: order
+ref, items, total, delivery, timestamp.
+
+Back in Notion: `Action Sent` is ticked (idempotency — the next cron run does
+nothing) and the Run Log shows `cron · approvalWatcher · action`.
+
+### 5. The unhappy paths (30s each, optional)
+- **Needs Human**: paste garbage (`asjdfajfasof`) — order lands at Needs Human
+  with the raw message preserved, Run Log `needs_human`. The system refuses to
+  invent a price (“1 chicken biryani” → `⚠️ off-menu` on a menu that has no
+  chicken).
+- **Duplicate**: paste the same message again → Run Log `duplicate`, no new
+  order (sha-256 fingerprint of message + phone + date).
+- **Action Failed**: (skip in live demo, mention it) a broken email key flips
+  the order to Action Failed with the Run Log row explaining why — the
+  automation reports its own failures instead of hiding them.
+
+### 6. Close (30s)
+Run Log is full of rows from Day 1 onward — timestamps prove the system ran
+without anyone touching it. And the whole workspace is re-creatable: the repo
+builds it idempotently (`npm run bootstrap` + `npm run check-setup`) on any
+Notion workspace — no copy-pasting of database IDs, everything resolves by
+title.
+
+---
+
+## Judging-criteria mapping
+
+| Criterion | Where it's proven |
+|---|---|
+| Notion is the interface | owner decides entirely in Notion (Needs You view); Run Log lives in Notion |
+| Code is the engine | API-accessed databases, AI parse, pricing, dedupe, watcher, emails — no no-code platform |
+| Real action outside Notion | customer emails with PDF receipts via Resend + pdf-lib |
+| Human approval | nothing sends without a human moving Status to Confirmed |
+| Run Log proof | rows written by code since Day 1 across webhook/cron/health/watcher |
+| Portability | `npm run bootstrap` re-creates the workspace anywhere; IDs resolve by title |
+| AI vs rules | AI only for messy text parsing; pricing/dedupe are plain functions |
+
+## Likely judge questions — 1-line answers
+
+- **“Why tiffin?”** Delivery apps skip the mess market — daily cadence, tiny
+  margins, chaotic WhatsApp orders. Perfect automation demo, real business.
+- **“Why not the WhatsApp Business API?”** Meta's official API is heavy for a
+  hackathon; the demo uses webhook + Inbox as the intake, so swapping
+  WhatsApp later is a one-line integration.
+- **“Why an LLM at all?”** Because the input is unbounded human text in
+  Hinglish (“tomoro”, “kal”, “parso”). If-statements can't parse that; they
+  *can* price and dedupe — so that's where they live.
+- **“Is it actually running?”** Run Log has rows since Day 1, plus
+  tiffin-butler.onrender.com is served by this repo's code; cron-job.org pings
+  it every minute.
+- **“Where does the money come from?”** Free tiers end-to-end: Groq, Resend
+  sandbox, Render, cron-job.org.
+- **“Can it send to real customers?”** Yes — verify a domain in Resend and set
+  `EMAIL_DELIVERY=customer`; the sandbox demo mode (default) delivers to the
+  owner's inbox with the customer's parsed address in the subject.

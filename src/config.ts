@@ -11,5 +11,8 @@ export const env = {
   llmModel: process.env.LLM_MODEL ?? "openai/gpt-oss-120b",
 
   resendApiKey: process.env.RESEND_API_KEY ?? "",
+  resendApiUrl: process.env.RESEND_API_URL ?? "https://api.resend.com/emails",
   emailFrom: process.env.EMAIL_FROM ?? "Tiffin Butler <onboarding@resend.dev>",
+  emailTo: process.env.EMAIL_TO ?? "thakur71039@gmail.com",
+  emailDelivery: (process.env.EMAIL_DELIVERY ?? "sandbox") === "customer" ? "customer" : "sandbox",
 };

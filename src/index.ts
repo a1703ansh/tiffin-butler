@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { env } from "./config.js";
 import { processMessage, scanInbox } from "./jobs/processInbox.js";
+import { approvalWatcher } from "./jobs/approvalWatcher.js";
 import { healthCheck } from "./jobs/healthCheck.js";
 import { writeRunLog } from "./runlog.js";
 
@@ -33,10 +34,10 @@ app.post("/webhook/order", async (req, reply) => {
   }
 });
 
-// Trigger 2 (cron): the every-minute ping — scans the Inbox page for new messages.
+// Trigger 2 (cron): the every-minute ping — approval watcher + Inbox scan.
 app.get("/cron/process", async () => {
-  const inbox = await scanInbox("cron");
-  return { ok: true, time: new Date().toISOString(), inboxProcessed: inbox.processed };
+  const [watched, inbox] = await Promise.all([approvalWatcher("cron"), scanInbox("cron")]);
+  return { ok: true, time: new Date().toISOString(), actionsTaken: watched.acted, inboxProcessed: inbox.processed };
 });
 
 // Trigger 3 (cron): hourly heartbeat — spreads Run Log rows across the event.

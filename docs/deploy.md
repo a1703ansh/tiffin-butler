@@ -24,10 +24,21 @@ render.com with GitHub).
    ```
    NOTION_TOKEN=ntn_...
    APP_URL=https://tiffin-butler.onrender.com
-   # LLM keys come on Day 3; email keys on Day 4:
-   # LLM_API_KEY=...
-   # RESEND_API_KEY=...
+   LLM_API_KEY=...
+   RESEND_API_KEY=...
+   EMAIL_FROM=Tiffin Butler <onboarding@resend.dev>
+   EMAIL_TO=thakur71039@gmail.com
+   EMAIL_DELIVERY=sandbox
    ```
+
+   About email on Render: the free Resend sandbox (`onboarding@resend.dev`)
+   can only deliver to the account owner's verified inbox — so in
+   `EMAIL_DELIVERY=sandbox` mode every receipt/decline goes to `EMAIL_TO`
+   with the customer's parsed address noted in the subject/body. That keeps
+   the happy path demonstrable at zero cost. To send to real customers later,
+   verify your own domain in the Resend dashboard, switch
+   `EMAIL_FROM=Tiffin Butler <orders@yourdomain.com>` and
+   `EMAIL_DELIVERY=customer`.
 
    Nothing else is needed — the database/page ids auto-resolve by title.
 5. **Create Web Service.** First build takes a few minutes. When it is live,
@@ -58,6 +69,11 @@ render.com with GitHub).
   - `cron · scanInbox · <time>` — only when the Inbox has new lines
 - Paste a message into the **Inbox** page; within a minute a draft order
   appears in Orders and the Inbox line gets a `[done]` prefix.
+- Open the order in the **Needs You** view and set Status to **Confirmed**
+  (or **Rejected**). Within a minute the approval watcher emails the customer
+  a receipt (`Action Sent` checkbox gets ticked; a second run does nothing) or
+  a decline email. A missing/bad `RESEND_API_KEY` instead flips the order to
+  **Action Failed** — the Run Log row explains why.
 - Shut your laptop. It still works — that is the demo.
 
 ## 4. Local run (development)

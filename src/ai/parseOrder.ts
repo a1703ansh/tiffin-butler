@@ -12,6 +12,7 @@ export const parsedOrderSchema = z.object({
   deliveryTime: z.string().nullable().optional(),
   room: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional(),
   language: z.string().nullable().optional(),
   confidence: z.enum(["high", "low"]).default("high"),
 });
@@ -42,11 +43,12 @@ function buildPrompt(raw: string): { system: string; user: string } {
     `- deliveryDate: convert day words to an absolute date YYYY-MM-DD. "tomorrow" and "kal" and "aaj kal" -> tomorrow relative to today's date; "today"/"aaj" -> today; "parso" -> day after tomorrow. If the day is genuinely unclear, use null.`,
     `- deliveryTime: keep the value as stated ("8am", "1:30 pm"), or use the meal slot (breakfast/lunch/dinner) if that is all that is given.`,
     `- phone: a 10-digit Indian mobile number if present, else null.`,
+    `- email: the customer's email address if present, else null. Validate format strictly; never invent one.`,
     `- customerName: the person's name if present, else null.`,
     `- room: hostel room/block/flat if present, else null.`,
     `- language: dominant language of the message ("en", "hi", "hinglish", ...).`,
     `- confidence: "high" only when at least the items AND a delivery day are clear, otherwise "low".`,
-    `JSON keys exactly: customerName, phone, items, deliveryDate, deliveryTime, room, note, language, confidence`,
+    `JSON keys exactly: customerName, phone, email, items, deliveryDate, deliveryTime, room, note, language, confidence`,
   ].join("\n");
 
   return { system, user: raw };

@@ -11,13 +11,15 @@
 import "dotenv/config";
 import { Client, type DataSourceObjectResponse } from "@notionhq/client";
 
-type PropertyKind = "title" | "rich_text" | "select" | "number" | "date" | "relation";
+type PropertyKind = "title" | "rich_text" | "select" | "number" | "date" | "relation" | "checkbox";
 
 const REQUIRED_ORDERS: Record<string, PropertyKind> = {
   Summary: "title",
   Status: "select",
   Customer: "rich_text",
   Phone: "rich_text",
+  "Customer Email": "rich_text",
+  "Action Sent": "checkbox",
   Items: "rich_text",
   Total: "number",
   Delivery: "date",

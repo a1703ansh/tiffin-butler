@@ -46,6 +46,8 @@ const ORDERS_PROPERTIES: Record<string, PropertyConfigurationRequest> = {
   },
   Customer: { type: "rich_text", rich_text: {} },
   Phone: { type: "rich_text", rich_text: {} },
+  "Customer Email": { type: "rich_text", rich_text: {} },
+  "Action Sent": { type: "checkbox", checkbox: {} },
   Items: { type: "rich_text", rich_text: {} },
   Total: { type: "number", number: { format: "rupee" } },
   Delivery: { type: "date", date: {} },
@@ -265,6 +267,23 @@ async function main(): Promise<number> {
     check("Orders database exists", true, ordersDs.slice(0, 8) + "\u2026");
   }
   if (!ordersDs) return 1;
+
+  // Orders: backfill any props the live database is missing (idempotent add).
+  {
+    const current = await client.dataSources.retrieve({ data_source_id: ordersDs });
+    const missing = Object.entries(ORDERS_PROPERTIES).filter(([name]) => !current.properties[name]);
+    if (missing.length > 0) {
+      const merged: Record<string, unknown> = { ...current.properties };
+      for (const [name, def] of Object.entries(ORDERS_PROPERTIES)) {
+        if ("select" in def || "checkbox" in def) merged[name] = def;
+        else if (!merged[name]) merged[name] = def;
+      }
+      await client.dataSources.update({ data_source_id: ordersDs, properties: merged as never });
+      check("Orders schema backfilled", true, missing.map(([n]) => n).join(", "));
+    } else {
+      check("Orders schema up to date", true);
+    }
+  }
 
   // 3. Run Log database (relation points at Orders data source)
   let runLogDs = await findDataSourceByTitle(client, "Run Log");

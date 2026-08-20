@@ -45,6 +45,7 @@ type OrderCreate = {
   confidence: "high" | "low";
   customerName?: string;
   phone?: string;
+  email?: string;
   items?: string;
   total?: number;
   deliveryDate?: string;
@@ -63,6 +64,7 @@ async function createOrder(input: OrderCreate): Promise<string> {
   };
   if (input.customerName) properties.Customer = richText(input.customerName);
   if (input.phone) properties.Phone = richText(input.phone);
+  if (input.email) properties["Customer Email"] = richText(input.email);
   if (input.items) properties.Items = richText(input.items);
   if (input.total !== undefined) properties.Total = number(input.total);
   if (input.deliveryDate) properties.Delivery = date(input.deliveryDate);
@@ -154,6 +156,7 @@ export async function processMessage(raw: string, trigger: RunLogEntry["trigger"
     confidence: parsed.confidence === "low" ? "low" : needsHuman ? "low" : "high",
     customerName: parsed.customerName ?? undefined,
     phone: parsed.phone ?? undefined,
+    email: parsed.email ?? undefined,
     items: pricing.lineItems.length > 0 ? formatLineItems(pricing.lineItems) : undefined,
     total: pricing.total > 0 ? pricing.total : undefined,
     deliveryDate: parsed.deliveryDate ?? undefined,

@@ -20,6 +20,10 @@ export function number(n: number | null | undefined) {
   return { number: n ?? null };
 }
 
+export function checkbox(value: boolean) {
+  return { checkbox: value };
+}
+
 export function date(iso: string | null | undefined) {
   return { date: iso ? { start: iso } : null };
 }
@@ -45,4 +49,14 @@ export function selectOf(prop: PageProperty | undefined): string | null {
 export function numberOf(prop: PageProperty | undefined): number | null {
   if (!prop || prop.type !== "number") return null;
   return prop.number;
+}
+
+export function checkboxOf(prop: PageProperty | undefined): boolean {
+  if (!prop || prop.type !== "checkbox") return false;
+  return prop.checkbox ?? false;
+}
+
+export function dateOf(prop: PageProperty | undefined): string | null {
+  if (!prop || prop.type !== "date") return null;
+  return prop.date?.start ?? null;
 }

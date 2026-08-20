@@ -15,4 +15,10 @@ export const env = {
   emailFrom: process.env.EMAIL_FROM ?? "Tiffin Butler <onboarding@resend.dev>",
   emailTo: process.env.EMAIL_TO ?? "thakur71039@gmail.com",
   emailDelivery: (process.env.EMAIL_DELIVERY ?? "sandbox") === "customer" ? "customer" : "sandbox",
+
+  whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN ?? "",
+  whatsappAccessToken: process.env.WHATSAPP_ACCESS_TOKEN ?? "",
+  whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? "",
+  whatsappGraphUrl: process.env.WHATSAPP_GRAPH_URL ?? "https://graph.facebook.com/v21.0",
+  whatsappReplies: process.env.WHATSAPP_REPLIES === "true",
 };

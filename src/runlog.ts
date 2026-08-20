@@ -4,7 +4,7 @@ import { business } from "./business.config.js";
 import { date, number, richText, select, title, relation } from "./notion/schema.js";
 
 export type RunLogEntry = {
-  trigger: "webhook" | "cron" | "manual" | "health";
+  trigger: "webhook" | "cron" | "manual" | "health" | "whatsapp";
   job: string;
   outcome: "success" | "failed" | "skipped" | "duplicate" | "needs_human" | "action";
   orderId?: string;

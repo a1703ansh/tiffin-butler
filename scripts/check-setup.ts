@@ -15,6 +15,7 @@ type PropertyKind = "title" | "rich_text" | "select" | "number" | "date" | "rela
 
 const REQUIRED_ORDERS: Record<string, PropertyKind> = {
   Summary: "title",
+  Channel: "rich_text",
   Status: "select",
   Customer: "rich_text",
   Phone: "rich_text",
@@ -48,7 +49,7 @@ const REQUIRED_SELECT_OPTIONS = {
   Status: ["New", "Draft", "Pending Approval", "Needs Human", "Confirmed", "Rejected", "Action Failed"],
   Confidence: ["high", "low"],
   Priority: ["normal", "urgent"],
-  Trigger: ["webhook", "cron", "manual", "health"],
+  Trigger: ["webhook", "cron", "manual", "health", "whatsapp"],
   Outcome: ["success", "failed", "skipped", "duplicate", "needs_human", "action"],
 } as const;
 

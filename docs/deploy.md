@@ -29,6 +29,11 @@ render.com with GitHub).
    EMAIL_FROM=Tiffin Butler <onboarding@resend.dev>
    EMAIL_TO=thakur71039@gmail.com
    EMAIL_DELIVERY=sandbox
+   # WhatsApp Cloud API (dormant until set — see docs/whatsapp.md):
+   WHATSAPP_VERIFY_TOKEN=
+   WHATSAPP_ACCESS_TOKEN=
+   WHATSAPP_PHONE_NUMBER_ID=
+   WHATSAPP_REPLIES=false
    ```
 
    About email on Render: the free Resend sandbox (`onboarding@resend.dev`)
@@ -97,5 +102,6 @@ Invoke-RestMethod -Method Post -Uri http://localhost:3000/webhook/order `
 | Endpoint | Called by | What it does |
 |---|---|---|
 | `POST /webhook/order` | inbound messages (any sender) | Intake one order message |
-| `GET /cron/process` | cron-job.org every minute | Scan Inbox page + (Day 4) approval watcher |
+| `GET/POST /webhook/whatsapp` | Meta Cloud API (day-of setup, docs/whatsapp.md) | WhatsApp webhook handshake + intake |
+| `GET /cron/process` | cron-job.org every minute | Scan Inbox page + approval watcher |
 | `GET /cron/health` | cron-job.org hourly | Heartbeat row → proof spread across days |

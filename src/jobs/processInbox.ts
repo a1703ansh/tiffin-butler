@@ -40,6 +40,7 @@ function humanSummary(
 type OrderCreate = {
   summary: string;
   status: "Pending Approval" | "Needs Human";
+  channel: string;
   raw: string;
   aiSummary: string;
   confidence: "high" | "low";
@@ -58,6 +59,7 @@ async function createOrder(input: OrderCreate): Promise<string> {
   const properties: Record<string, unknown> = {
     Summary: title(input.summary || "Order"),
     Status: select(input.status),
+    Channel: richText(input.channel),
     "Raw Message": richText(input.raw),
     "AI Summary": richText(input.aiSummary),
     Confidence: select(input.confidence),
@@ -84,12 +86,18 @@ async function createOrder(input: OrderCreate): Promise<string> {
  * Clean orders pause at "Pending Approval" (human gate).
  * Anything unclear lands at "Needs Human" with the raw message preserved.
  */
-export async function processMessage(raw: string, trigger: RunLogEntry["trigger"]): Promise<ProcessResult> {
+export async function processMessage(
+  raw: string,
+  trigger: RunLogEntry["trigger"],
+  channel?: string,
+): Promise<ProcessResult> {
   const text = raw.trim();
   if (!text) {
     await writeRunLog({ trigger, job: "processInbox", outcome: "failed", error: "empty message" });
     return { status: "skipped" };
   }
+
+  const source = channel ?? (trigger === "cron" ? "inbox" : trigger);
 
   // 1. AI parse (messy text -> structured order)
   let parsed;
@@ -100,6 +108,7 @@ export async function processMessage(raw: string, trigger: RunLogEntry["trigger"
     const orderId = await createOrder({
       summary: `Needs human \u2014 unparseable`,
       status: "Needs Human",
+      channel: source,
       raw: text,
       aiSummary: `\u2753 Could not parse: ${short(reason, 60)}. Raw message preserved below.`,
       confidence: "low",
@@ -151,6 +160,7 @@ export async function processMessage(raw: string, trigger: RunLogEntry["trigger"
   const orderId = await createOrder({
     summary: `${customerPrefix}${formatLineItems(pricing.lineItems) || short(text, 60)}`,
     status,
+    channel: source,
     raw: text,
     aiSummary,
     confidence: parsed.confidence === "low" ? "low" : needsHuman ? "low" : "high",

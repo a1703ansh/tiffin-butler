@@ -17,6 +17,7 @@
 import "dotenv/config";
 import { Client, type DatabaseObjectResponse, type DataSourceObjectResponse, type PageObjectResponse } from "@notionhq/client";
 import type { PropertyConfigurationRequest } from "@notionhq/client/build/src/api-endpoints/common.js";
+import { HOME_V2_MARKER, STATS_MARKER } from "../src/notion/constants.js";
 
 function rt(text: string) {
   return { type: "text" as const, text: { content: text } };
@@ -30,6 +31,7 @@ type Prop = PropertyConfigurationRequest;
 
 const ORDERS_PROPERTIES: Record<string, PropertyConfigurationRequest> = {
   Summary: { type: "title", title: {} },
+  Channel: { type: "rich_text", rich_text: {} },
   Status: {
     type: "select",
     select: {
@@ -87,6 +89,7 @@ const RUN_LOG_PROPERTIES: Record<string, PropertyConfigurationRequest> = {
         { name: "cron", color: "gray" },
         { name: "manual", color: "green" },
         { name: "health", color: "pink" },
+        { name: "whatsapp", color: "green" },
       ],
     },
   },
@@ -109,91 +112,84 @@ const RUN_LOG_PROPERTIES: Record<string, PropertyConfigurationRequest> = {
   Meta: { type: "rich_text", rich_text: {} },
 };
 
-const HOME_CONTENT_BLOCKS = [
-  {
-    object: "block",
-    type: "heading_2",
-    heading_2: { rich_text: rtArray("How it works") },
-  },
-  {
-    object: "block",
-    type: "bulleted_list_item",
-    bulleted_list_item: { rich_text: rtArray("A customer's order message arrives (webhook, cron scan, or pasted in Inbox).") },
-  },
-  {
-    object: "block",
-    type: "bulleted_list_item",
-    bulleted_list_item: { rich_text: rtArray("Code parses it with AI, prices it, and creates an order draft.") },
-  },
-  {
-    object: "block",
-    type: "bulleted_list_item",
-    bulleted_list_item: { rich_text: rtArray("The owner reviews it — Approve, Edit, or Reject — all inside Notion.") },
-  },
-  {
-    object: "block",
-    type: "bulleted_list_item",
-    bulleted_list_item: { rich_text: rtArray("On approval, code emails the customer a confirmation + PDF receipt.") },
-  },
-  {
-    object: "block",
-    type: "bulleted_list_item",
-    bulleted_list_item: { rich_text: rtArray("Every run is logged in the Run Log database with a timestamp.") },
-  },
-  {
-    object: "block",
-    type: "heading_2",
-    heading_2: { rich_text: rtArray("Status legend") },
-  },
-  {
-    object: "block",
-    type: "bulleted_list_item",
-    bulleted_list_item: {
-      rich_text: rtArray("Pending Approval", " — the owner must decide (see the ", "Needs You", " view)"),
-    },
-  },
-  {
-    object: "block",
-    type: "bulleted_list_item",
-    bulleted_list_item: {
-      rich_text: rtArray("Needs Human", " — the AI couldn't parse it; raw message is in ", "Raw Message"),
-    },
-  },
-  {
-    object: "block",
-    type: "bulleted_list_item",
-    bulleted_list_item: { rich_text: rtArray("Confirmed", " — approval done, confirmation email sent") },
-  },
-  {
-    object: "block",
-    type: "bulleted_list_item",
-    bulleted_list_item: { rich_text: rtArray("Rejected", " — owner declined") },
-  },
-  {
-    object: "block",
-    type: "bulleted_list_item",
-    bulleted_list_item: { rich_text: rtArray("Action Failed", " — something crashed; a Run Log row explains what") },
-  },
-  {
-    object: "block",
-    type: "heading_2",
-    heading_2: { rich_text: rtArray("Who does what") },
-  },
-  {
-    object: "block",
-    type: "bulleted_list_item",
-    bulleted_list_item: {
-      rich_text: rtArray("The owner decides via the ", "Needs You", " view (Pending Approval / Needs Human / Action Failed)."),
-    },
-  },
-  {
-    object: "block",
-    type: "bulleted_list_item",
-    bulleted_list_item: {
-      rich_text: rtArray("The code writes Run Log rows and status transitions — never hand-edit the Run Log."),
-    },
-  },
-];
+const HOME_COVER_URL =
+  "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?ixlib=rb-4.0.3&q=80&w=1920&auto=format&fit=crop";
+
+function block(type: string, value: Record<string, unknown>): Record<string, unknown> {
+  return { object: "block", type, [type]: value };
+}
+
+/** Home v2 showcase, with live links to the real child pages/databases. */
+function homeShowcaseBlocks(ordersBlockId: string, runLogBlockId: string, inboxBlockId: string): Record<string, unknown>[] {
+  return [
+    block("heading_1", { rich_text: rtArray(HOME_V2_MARKER) }),
+    block("quote", {
+      rich_text: rtArray(
+        "What would take your junior 5 minutes per message — code does in 3 seconds, and ",
+        "the final yes/no stays a human decision in Notion.",
+      ),
+    }),
+    block("divider", {}),
+    block("callout", {
+      rich_text: rtArray("⚡ HOW IT WORKS"),
+      icon: { type: "emoji", emoji: "⚡" },
+      children: [
+        block("bulleted_list_item", {
+          rich_text: rtArray("📲  A customer's order message arrives — webhook, a paste in the Inbox, or WhatsApp."),
+        }),
+        block("bulleted_list_item", {
+          rich_text: rtArray("🤖  AI parses it (Groq), rules price it, a fingerprint dedupes it."),
+        }),
+        block("bulleted_list_item", {
+          rich_text: rtArray("✅  You decide inside Notion in the ", "Needs You", " view — Approve or Reject."),
+        }),
+        block("bulleted_list_item", {
+          rich_text: rtArray("📧  Real action outside Notion: confirmation email + PDF receipt to the customer."),
+        }),
+        block("bulleted_list_item", {
+          rich_text: rtArray("📋  Every run is written to Run Log by code — timestamps prove it ran without you."),
+        }),
+      ],
+    }),
+    block("divider", {}),
+    block("heading_2", { rich_text: rtArray("🔍 Live systems") }),
+    block("link_to_page", { database_id: ordersBlockId }),
+    block("link_to_page", { database_id: runLogBlockId }),
+    block("link_to_page", { page_id: inboxBlockId }),
+    block("divider", {}),
+    block("heading_2", { rich_text: rtArray("📊 Status legend") }),
+    block("table", {
+      table_width: 2,
+      has_column_header: true,
+      has_row_header: false,
+      children: [
+        block("table_row", { cells: [rtArray("Status"), rtArray("Meaning")] }),
+        block("table_row", {
+          cells: [rtArray("🟠 Pending Approval"), rtArray("Owner must decide — live in the Needs You view")],
+        }),
+        block("table_row", {
+          cells: [rtArray("🟡 Needs Human"), rtArray("AI unsure / off-menu — raw message is preserved")],
+        }),
+        block("table_row", {
+          cells: [rtArray("🟢 Confirmed"), rtArray("Approval done — receipt email + PDF sent")],
+        }),
+        block("table_row", {
+          cells: [rtArray("🔴 Rejected"), rtArray("Owner declined — decline email sent")],
+        }),
+        block("table_row", {
+          cells: [rtArray("🟣 Action Failed"), rtArray("Automation crashed — Run Log row says why")],
+        }),
+      ],
+    }),
+    block("divider", {}),
+    block("bookmark", { url: "https://tiffin-butler.onrender.com" }),
+    block("callout", {
+      rich_text: rtArray("📮 TRY IT", "  —  open the Inbox (link above), paste an order message, wait ~60s."),
+      icon: { type: "emoji", emoji: "📮" },
+    }),
+    block("paragraph", { rich_text: rtArray(STATS_MARKER + " loading…") }),
+  ];
+}
 
 function check(label: string, passed: boolean, detail = ""): void {
   console.log(`  ${passed ? "\u2714" : "\u2718"} ${label}${detail ? "  -> " + detail : ""}`);
@@ -308,13 +304,37 @@ async function main(): Promise<number> {
   } else {
     check("Run Log database exists", true, runLogDs.slice(0, 8) + "\u2026");
   }
+  if (!runLogDs) return 1;
+
+  // Run Log: backfill missing props + select options (idempotent add).
+  {
+    const current = await client.dataSources.retrieve({ data_source_id: runLogDs });
+    const merged: Record<string, unknown> = { ...current.properties };
+    let touched: string[] = [];
+    for (const [name, def] of Object.entries(RUN_LOG_PROPERTIES)) {
+      if ("select" in def || "checkbox" in def) {
+        if (JSON.stringify(merged[name]) !== JSON.stringify(def)) touched.push(name);
+        merged[name] = def;
+      } else if (!merged[name]) {
+        merged[name] = def;
+        touched.push(name);
+      }
+    }
+    if (touched.length > 0) {
+      await client.dataSources.update({ data_source_id: runLogDs, properties: merged as never });
+      check("Run Log schema backfilled", true, touched.join(", "));
+    } else {
+      check("Run Log schema up to date", true);
+    }
+  }
 
   // 4. Inbox page
   const existingInbox = await findPageByTitle(client, "Inbox");
   if (!existingInbox) {
-    await client.pages.create({
+    const created = await client.pages.create({
       parent: { type: "page_id", page_id: homeId },
       properties: { title: { title: rtArray("Inbox") } },
+      icon: { type: "emoji", emoji: "📥" },
       content: [
         {
           object: "block",
@@ -325,19 +345,59 @@ async function main(): Promise<number> {
         },
       ],
     });
-    check("Inbox page created", true);
+    check("Inbox page created", true, created.id.slice(0, 8) + "\u2026");
   } else {
     check("Inbox page exists", true, existingInbox.slice(0, 8) + "\u2026");
+    await client.pages.update({ page_id: existingInbox, icon: { type: "emoji", emoji: "📥" } });
   }
 
-  // 5. Home page content (only if the page has no written content yet)
+  // 5. Home page dressing: icon + cover.
+  await client.pages.update({
+    page_id: homeId,
+    icon: { type: "emoji", emoji: "🍛" },
+    cover: { type: "external", external: { url: HOME_COVER_URL } },
+  });
+  check("home page icon + cover set", true);
+
+  // 6. Home page content v2 (idempotent: marker heading_1 identifies v2).
   const children = await client.blocks.children.list({ block_id: homeId });
-  const hasWrittenContent = children.results.some((b) => "type" in b && (b.type === "heading_2" || b.type === "paragraph"));
-  if (!hasWrittenContent) {
-    await client.blocks.children.append({ block_id: homeId, children: HOME_CONTENT_BLOCKS as never });
-    check("home page content written", true);
+  const isV2 = children.results.some(
+    (b) => "type" in b && b.type === "heading_1" && (b as { [k: string]: unknown }).heading_1
+      ? ((b as { heading_1: { rich_text: Array<{ plain_text: string }> } }).heading_1.rich_text ?? []).some((r) => r.plain_text === HOME_V2_MARKER)
+      : false,
+  );
+
+  if (!isV2) {
+    // Remove old text blocks, keep embedded people/pages/databases.
+    for (const b of children.results) {
+      if (!("type" in b)) continue;
+      const t = b.type;
+      if (t === "child_page" || t === "child_database") continue;
+      await client.blocks.delete({ block_id: b.id }).catch(() => {});
+    }
+    check("old home content removed", true);
+
+    let ordersBlockId = "";
+    let runLogBlockId = "";
+    let inboxBlockId = "";
+    const fresh = await client.blocks.children.list({ block_id: homeId });
+    for (const b of fresh.results) {
+      if (!("type" in b)) continue;
+      if (b.type === "child_database") {
+        if (!ordersBlockId) ordersBlockId = b.id;
+        else if (!runLogBlockId) runLogBlockId = b.id;
+      } else if (b.type === "child_page" && !inboxBlockId) {
+        inboxBlockId = b.id;
+      }
+    }
+
+    await client.blocks.children.append({
+      block_id: homeId,
+      children: homeShowcaseBlocks(ordersBlockId, runLogBlockId, inboxBlockId) as never,
+    });
+    check("home page v2 content written", true);
   } else {
-    check("home page already has content, skipped", true);
+    check("home page already v2, skipped", true);
   }
 
   console.log("");

@@ -83,3 +83,6 @@ export const getRunLogDataSource = (): Promise<string> =>
 
 export const getInboxPage = (): Promise<string> =>
   resolvePage("Inbox", process.env.NOTION_INBOX_PAGE_ID);
+
+export const getHomePage = (): Promise<string> =>
+  resolvePage("Tiffin Butler", process.env.NOTION_HOME_PAGE_ID);

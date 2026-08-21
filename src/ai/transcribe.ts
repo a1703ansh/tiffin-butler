@@ -22,6 +22,14 @@ export class TranscribeError extends Error {
 
 const MAX_BYTES = 25 * 1024 * 1024;
 
+// Biasing Whisper toward romanized Hindi keeps the output in the same script
+// our parser (and the demo) expects; Devanagari output still works — it just
+// routes to Needs Human more often.
+const HINGLISH_PROMPT =
+  "Hinglish tiffin order voice note, romanized Hindi in Latin script, e.g. " +
+  "\"bhaiya do idli set aur ek dosa kal subah 8 baje, room 214\". " +
+  "Items: idli set, dosa, upma, pongal, curd rice, chapati, meals.";
+
 export async function transcribeAudio(input: TranscribeInput): Promise<{ text: string }> {
   if (!env.llmApiKey) throw new TranscribeError("LLM_API_KEY is not set", "not_configured");
   if (!input.buffer || input.buffer.length < 512) {
@@ -37,6 +45,7 @@ export async function transcribeAudio(input: TranscribeInput): Promise<{ text: s
   form.append("model", env.whisperModel);
   form.append("response_format", "json");
   form.append("temperature", "0");
+  form.append("prompt", HINGLISH_PROMPT);
 
   let res: Response;
   try {

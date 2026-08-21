@@ -3,12 +3,14 @@ import { getClient, getOrdersDataSource } from "../notion/client.js";
 import { checkbox, checkboxOf, dateOf, numberOf, select, selectOf, textOf } from "../notion/schema.js";
 import { writeRunLog, type RunLogEntry } from "../runlog.js";
 import { sendReceiptEmail, sendRejectionEmail } from "../actions/email.js";
+import { hasPriorOrders } from "../customers.js";
 
 type OrderRow = {
   id: string;
   summary: string;
   customerName: string | null;
   email: string | null;
+  phone: string | null;
   items: string;
   total: number | null;
   deliveryDate: string | null;
@@ -24,6 +26,7 @@ function toRow(page: PageObjectResponse): OrderRow {
     summary: textOf(p.Summary),
     customerName: textOf(p.Customer) || null,
     email: textOf(p["Customer Email"]) || null,
+    phone: textOf(p.Phone) || null,
     items: textOf(p.Items),
     total: numberOf(p.Total),
     deliveryDate: dateOf(p.Delivery),
@@ -77,10 +80,13 @@ export async function approvalWatcher(trigger: RunLogEntry["trigger"]): Promise<
           summary: order.summary || "Order",
           email: order.email,
           customerName: order.customerName,
+          phone: order.phone,
           items: order.items,
           total: order.total,
           deliveryDate: order.deliveryDate,
           room: order.room,
+          greeting:
+            order.phone && (await hasPriorOrders(order.phone, order.id)) ? "Welcome back" : undefined,
         })
       : await sendRejectionEmail({
           id: order.id,

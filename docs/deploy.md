@@ -117,7 +117,10 @@ curl.exe http://localhost:3000/cron/digest
 
 | Endpoint | Called by | What it does |
 |---|---|---|
-| `POST /webhook/order` | inbound messages (any sender) | Intake one order message |
+| `GET /` | anyone | Live HTML dashboard (stats, menu, Run Log tail) — refreshes every 60s |
+| `GET/POST /order` | a customer's phone | Mobile order widget → real intake pipeline (channel `web`) |
+| `GET /stats` | humans/curl | Dashboard numbers as JSON |
+| `POST /webhook/order` | inbound messages (any sender) | Intake one order message; also detects cancel requests |
 | `POST /webhook/voice` | audio uploads (`curl -F file=@note.m4a …`) | Whisper transcribe → same intake pipeline |
 | `GET/POST /webhook/whatsapp` | Meta Cloud API (day-of setup, docs/whatsapp.md) | WhatsApp webhook handshake + text/voice intake |
 | `GET /cron/process` | cron-job.org every minute | Scan Inbox page + approval watcher |

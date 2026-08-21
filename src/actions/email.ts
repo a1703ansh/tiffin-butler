@@ -3,7 +3,7 @@ import { buildReceipt, toBase64, type ReceiptOrder } from "./receipt.js";
 
 export type EmailResult = { ok: true; to: string } | { ok: false; error: string };
 
-type OrderEmail = ReceiptOrder & { email?: string | null };
+type OrderEmail = ReceiptOrder & { email?: string | null; greeting?: string; phone?: string | null };
 
 async function resendSend(payload: Record<string, unknown>): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   if (!env.resendApiKey) {
@@ -53,10 +53,14 @@ export async function sendReceiptEmail(order: OrderEmail): Promise<EmailResult> 
   const { to, customerNote } = deliveryRecipient(order);
   const pdf = await buildReceipt(order);
 
+  const hello = order.greeting
+    ? `${order.greeting}${order.customerName ? " " + order.customerName : ""}`
+    : `Hi${order.customerName ? " " + order.customerName : ""}`;
+
   const html = [
     `<div style="font-family: Arial, sans-serif; max-width: 560px; margin: auto;">`,
     `<h2 style="color: #d97b19;">Order confirmed 🎉</h2>`,
-    `<p>Hi${order.customerName ? " " + order.customerName : ""},</p>`,
+    `<p>${hello},</p>`,
     `<p>Your order has been <strong>confirmed</strong>:</p>`,
     `<p style="padding: 12px 16px; background: #f7f4ef; border-radius: 8px;">${order.summary}</p>`,
     order.deliveryDate ? `<p>📅 Delivery: <strong>${order.deliveryDate}</strong>${order.deliveryTime ? " at " + order.deliveryTime : ""}</p>` : "",
@@ -105,6 +109,32 @@ export async function sendRejectionEmail(order: OrderEmail): Promise<EmailResult
     from: env.emailFrom,
     to,
     subject: `Order declined — ${order.summary.slice(0, 60)}${customerNote}`,
+    html,
+  }).then((r) => (r.ok ? { ok: true, to } : r));
+}
+
+/** Cancelled order → confirmation that the cancellation was processed. */
+export async function sendCancellationEmail(order: OrderEmail): Promise<EmailResult> {
+  const { to, customerNote } = deliveryRecipient(order);
+
+  const html = [
+    `<div style="font-family: Arial, sans-serif; max-width: 560px; margin: auto;">`,
+    `<h2 style="color: #7f8c8d;">Order cancelled</h2>`,
+    `<p>Hi${order.customerName ? " " + order.customerName : ""},</p>`,
+    `<p>Your order has been <strong>cancelled</strong> as requested:</p>`,
+    `<p style="padding: 12px 16px; background: #f7f4ef; border-radius: 8px;">${order.summary}</p>`,
+    order.deliveryDate ? `<p>📅 Was scheduled for: ${order.deliveryDate}</p>` : "",
+    order.total ? `<p>💰 No charge — the ₹${order.total} order was withdrawn.</p>` : "",
+    `<p>Order again any time — just send a new message.</p>`,
+    customerNote ? `<p style="color: #777; font-size: 13px;">🔒 Sandbox demo: delivered to the owner's verified inbox${customerNote}.</p>` : "",
+    `<p style="color: #777; font-size: 12px;">Tiffin Butler · Notion hackathon</p>`,
+    `</div>`,
+  ].join("");
+
+  return resendSend({
+    from: env.emailFrom,
+    to,
+    subject: `Order cancelled — ${order.summary.slice(0, 60)}${customerNote}`,
     html,
   }).then((r) => (r.ok ? { ok: true, to } : r));
 }

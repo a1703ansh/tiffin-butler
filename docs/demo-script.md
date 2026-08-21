@@ -13,7 +13,8 @@ Run Log rows written by code only.
   (thakur71039@gmail.com). Keep the Run Log database open and sorted by
   Timestamp descending.
 - Have [tiffin-butler.onrender.com](https://tiffin-butler.onrender.com) ready
-  (`/` shows the service JSON page — written by code, not a clickup form).
+  (`/` is a live dashboard: today's orders, revenue, the Notion-edited menu,
+  and the latest automation runs).
 - Optionally paste two messages into the **Inbox** now so the first minute of
   the demo shows the cron intake happening live.
 
@@ -76,11 +77,26 @@ curl -X POST https://tiffin-butler.onrender.com/webhook/voice -F file=@note.m4a
 The response shows what Whisper heard, and Notion shows the parsed, priced,
 Pending Approval order. Same AI, same rules, one extra step: audio → text.
 
+### 7. Judge participation beats (60s, pick any)
+- **Live dashboard**: open [tiffin-butler.onrender.com](https://tiffin-butler.onrender.com)
+  — today's orders, confirmed revenue, waiting-on-owner counts, the live menu,
+  and the last automation runs. Refreshes itself.
+- **Order from their phone**: judges open `/order` on their phones and place a
+  real order; it lands in Notion seconds later (Channel = `web`).
+- **It remembers customers**: place a second order with the same phone but no
+  name/room — the order fills them in from history ("welcome back").
+- **Cancellation**: send "please cancel my order, phone <number>" → the order
+  flips to **Cancelled**, a cancellation email goes out, Run Log logs it. Two
+  live orders match? It refuses to guess and asks a human instead.
+- **The audit trail**: click an order in Notion → its **Order** relation on
+  every Run Log row shows the full automation trail for that single tiffin:
+  intake → parse → price → approval → receipt sent.
+
 Bonus beat: open the **Menu** database on Home and change Dosa ₹60 → ₹65 live;
 the next order prices at the new rate. *The owner runs this business from
 Notion — prices included.*
 
-### 7. Close (30s)
+### 8. Close (30s)
 Run Log is full of rows from Day 1 onward — timestamps prove the system ran
 without anyone touching it. And the whole workspace is re-creatable: the repo
 builds it idempotently (`npm run bootstrap` + `npm run check-setup`) on any
@@ -114,9 +130,13 @@ title.
 - **“What if the AI mishears a voice note?”** Same safety net as text: fuzzy
   menu matching first, and anything uncertain goes to Needs Human with the
   transcript preserved — never silently priced.
-- **“Is it actually running?”** Run Log has rows since Day 1, plus
-  tiffin-butler.onrender.com is served by this repo's code; cron-job.org pings
-  it every minute and emails the owner a digest every evening.
+- **“Is it actually running?”** Open the live dashboard — orders today,
+  revenue, menu, latest Run Log rows, refreshed every minute by cron-job.org.
+  Rows go back to Day 1; the owner also gets an evening digest email.
+- **“What if a customer wants to cancel?”** They just say so — “cancel my
+  order” matches their most recent live order by phone (or room), flips it to
+  Cancelled, emails confirmation, and logs everything. Ambiguous requests go
+  to Needs Human instead of guessing.
 - **“Where does the money come from?”** Free tiers end-to-end: Groq (chat +
   Whisper), Resend sandbox, Render, cron-job.org.
 - **“Can it send to real customers?”** Yes — verify a domain in Resend and set

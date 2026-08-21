@@ -97,15 +97,24 @@ curl -X POST http://localhost:3000/webhook/order \
 | Needs Human | uncertain parse / off-menu items / no delivery date — raw kept |
 | Confirmed | owner said yes — watcher emailed receipt + PDF |
 | Rejected | owner said no — watcher emailed decline |
+| Cancelled | customer asked to cancel — matched by phone/room, cancellation emailed |
 | Action Failed | automation crashed — Run Log row explains why |
 
 Run Log outcomes: `success` · `needs_human` · `duplicate` · `action` · `failed` · `skipped`.
+
+Extras beyond the core loop: **customer memory** (a returning phone number
+auto-fills name + room from past orders, receipts greet "Welcome back"),
+**cancellation** ("cancel my order…" flips the matching order and emails
+confirmation), and a **live public dashboard** at `/`.
 
 ## Endpoints
 
 | Endpoint | When | What it does |
 |---|---|---|
-| `POST /webhook/order` | an inbound message | intake (AI → price → dedupe → create) |
+| `GET /` | anyone | live HTML dashboard: today's stats, menu, recent Run Log rows |
+| `GET/POST /order` | a customer's phone/browser | mobile order widget → same intake pipeline |
+| `GET /stats` | humans/curl | the dashboard numbers as JSON |
+| `POST /webhook/order` | an inbound message | intake (AI → price → dedupe → create; detects cancel requests) |
 | `POST /webhook/voice` | an audio upload (or Meta voice note on demo day) | Whisper transcribe → same intake |
 | `GET/POST /webhook/whatsapp` | Meta Cloud API (dormant until envs set) | handshake + WhatsApp text/voice intake |
 | `GET /cron/process` | every minute | scan Inbox page + run approval watcher |
@@ -134,16 +143,20 @@ Database and page IDs are never hard-coded — everything resolves by title
 
 ```
 src/
-  index.ts                 Fastify server + endpoints
+  index.ts                 Fastify server + endpoints + HTML pages
   config.ts                env config
   business.config.ts       fallback menu, currency, timezone
   menu.ts                  live Menu loader from Notion (60s cache)
+  customers.ts             customer memory (phone → past name/room)
+  web/stats.ts             dashboard aggregation
+  web/pages.ts             landing page + mobile order widget (HTML)
   runlog.ts                single Run Log writer
   ai/parseOrder.ts         LLM parse (zod-validated)
   ai/transcribe.ts         Whisper voice-note transcription (Groq)
   pricing.ts               menu pricing (rules, fuzzy item matching)
   dedupe.ts                fingerprint dedupe (rules)
   jobs/processInbox.ts     intake + Inbox scan
+  jobs/cancelOrder.ts      cancellation flow (match → flip → email)
   jobs/approvalWatcher.ts  Confirmed/Rejected → email + Action Sent
   jobs/dailyDigest.ts      evening owner digest email
   jobs/healthCheck.ts      heartbeat

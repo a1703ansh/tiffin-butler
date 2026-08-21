@@ -8,6 +8,9 @@ import { dailyDigest } from "./jobs/dailyDigest.js";
 import { writeRunLog } from "./runlog.js";
 import { replyToWhatsApp, downloadWhatsAppMedia } from "./actions/whatsapp.js";
 import { transcribeAudio, TranscribeError } from "./ai/transcribe.js";
+import { collectStats } from "./web/stats.js";
+import { landingPage, orderFormPage } from "./web/pages.js";
+import { loadMenu } from "./menu.js";
 
 const app = Fastify({ logger: { level: "info" } });
 await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
@@ -16,20 +19,51 @@ function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-app.get("/", async () => ({
-  service: "tiffin-butler",
-  ok: true,
-  time: new Date().toISOString(),
-  endpoints: [
-    "POST /webhook/order",
-    "POST /webhook/whatsapp",
-    "GET /webhook/whatsapp",
-    "POST /webhook/voice",
-    "GET /cron/process",
-    "GET /cron/health",
-    "GET /cron/digest",
-  ],
-}));
+// Public dashboard (HTML) — live stats, today's menu, recent Run Log rows.
+app.get("/", async (_req, reply) => {
+  try {
+    return reply.type("text/html; charset=utf-8").send(landingPage(await collectStats()));
+  } catch {
+    return reply.type("text/html; charset=utf-8").send(
+      `<!doctype html><meta charset="utf-8"><title>Tiffin Butler</title><p>🍛 Tiffin Butler is running — Notion wiring unavailable right now. Endpoints: POST /webhook/order · POST /webhook/voice · GET /cron/*</p>`,
+    );
+  }
+});
+
+// JSON version of the dashboard numbers.
+app.get("/stats", async () => {
+  try {
+    return await collectStats();
+  } catch (err) {
+    return { ok: false, error: errMsg(err) };
+  }
+});
+
+// Mobile order widget (HTML form) + its JSON endpoint.
+app.get("/order", async (_req, reply) => {
+  const menu = await loadMenu();
+  return reply.type("text/html; charset=utf-8").send(orderFormPage(menu.entries.map((e) => ({ name: e.name, price: e.price }))));
+});
+
+app.post("/order", async (req, reply) => {
+  const body = (req.body ?? {}) as { message?: unknown };
+  const message = typeof body.message === "string" ? body.message.trim() : "";
+  if (!message) {
+    return reply.code(400).send({ ok: false, error: "missing string field 'message'" });
+  }
+  try {
+    const result = await processMessage(message, "webhook", "web");
+    return {
+      ok: true,
+      status: result.status,
+      orderId: result.orderId ?? result.existingOrderId,
+      note: result.note,
+    };
+  } catch (err) {
+    await writeRunLog({ trigger: "webhook", job: "processInbox", outcome: "failed", error: errMsg(err), meta: "web order" }).catch(() => {});
+    return reply.code(500).send({ ok: false, error: errMsg(err) });
+  }
+});
 
 // WhatsApp Cloud API: verification handshake (Meta GETs this with hub.* params).
 app.get("/webhook/whatsapp", async (req, reply) => {

@@ -6,11 +6,14 @@ import { formatLineItems, priceItems, type LineItem } from "../pricing.js";
 import { findOrderByFingerprint, orderFingerprint } from "../dedupe.js";
 import { business } from "../business.config.js";
 import { loadMenu } from "../menu.js";
+import { findRecentCustomer } from "../customers.js";
+import { looksLikeCancellation, processCancellation } from "./cancelOrder.js";
 
 export type ProcessResult = {
   status: "created" | "skipped" | "duplicate" | "needs_human";
   orderId?: string;
   existingOrderId?: string;
+  note?: string;
 };
 
 function short(text: string, max = 80): string {
@@ -100,6 +103,18 @@ export async function processMessage(
 
   const source = channel ?? (trigger === "cron" ? "inbox" : trigger);
 
+  // 0. Cancellation intent short-circuits intake when it matches a live order.
+  if (looksLikeCancellation(text)) {
+    const cancelled = await processCancellation(text, trigger);
+    if (cancelled) {
+      return {
+        status: cancelled.status === "cancelled" ? "created" : "skipped",
+        orderId: cancelled.orderId,
+        note: `cancel_${cancelled.status}`,
+      };
+    }
+  }
+
   // 0. Live menu from Notion (owner-editable; config fallback on failure)
   const menu = await loadMenu();
 
@@ -142,6 +157,17 @@ export async function processMessage(
     return { status: "duplicate", existingOrderId: existing };
   }
 
+  // 2.5 Customer memory: fill missing name/room from this phone's past orders.
+  let customerName = parsed.customerName ?? undefined;
+  let room = parsed.room ?? undefined;
+  if (parsed.phone && (!customerName || !room)) {
+    const mem = await findRecentCustomer(parsed.phone);
+    if (mem) {
+      customerName = customerName ?? mem.name;
+      room = room ?? mem.room;
+    }
+  }
+
   // 3. Price it (rules, not AI)
   const pricing = priceItems(parsed.items, menu.entries);
   const needsHuman =
@@ -151,16 +177,17 @@ export async function processMessage(
     pricing.lineItems.length === 0;
 
   const status: "Pending Approval" | "Needs Human" = needsHuman ? "Needs Human" : "Pending Approval";
+  const rememberedName = !parsed.customerName && !!customerName;
   const aiSummary = humanSummary(
     pricing.lineItems,
     pricing.total,
     pricing.unknownItems,
     parsed.deliveryDate,
     parsed.deliveryTime,
-    parsed.room,
-  );
+    room,
+  ) + (rememberedName ? " · welcome back (from order history)" : "");
 
-  const customerPrefix = parsed.customerName ? `${parsed.customerName} \u2014 ` : "";
+  const customerPrefix = customerName ? `${customerName} \u2014 ` : "";
   const orderId = await createOrder({
     summary: `${customerPrefix}${formatLineItems(pricing.lineItems) || short(text, 60)}`,
     status,
@@ -168,13 +195,13 @@ export async function processMessage(
     raw: text,
     aiSummary,
     confidence: parsed.confidence === "low" ? "low" : needsHuman ? "low" : "high",
-    customerName: parsed.customerName ?? undefined,
+    customerName,
     phone: parsed.phone ?? undefined,
     email: parsed.email ?? undefined,
     items: pricing.lineItems.length > 0 ? formatLineItems(pricing.lineItems) : undefined,
     total: pricing.total > 0 ? pricing.total : undefined,
     deliveryDate: parsed.deliveryDate ?? undefined,
-    room: parsed.room ?? undefined,
+    room,
     language: parsed.language ?? undefined,
     fingerprint,
   });

@@ -53,7 +53,7 @@ const REQUIRED_MENU: Record<string, PropertyKind> = {
 };
 
 const REQUIRED_SELECT_OPTIONS = {
-  Status: ["New", "Draft", "Pending Approval", "Needs Human", "Confirmed", "Rejected", "Action Failed"],
+  Status: ["New", "Draft", "Pending Approval", "Needs Human", "Confirmed", "Rejected", "Action Failed", "Cancelled"],
   Confidence: ["high", "low"],
   Priority: ["normal", "urgent"],
   Trigger: ["webhook", "cron", "manual", "health", "whatsapp", "voice"],

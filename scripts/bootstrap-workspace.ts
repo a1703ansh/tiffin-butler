@@ -44,6 +44,7 @@ const ORDERS_PROPERTIES: Record<string, PropertyConfigurationRequest> = {
         { name: "Confirmed", color: "green" },
         { name: "Rejected", color: "red" },
         { name: "Action Failed", color: "purple" },
+        { name: "Cancelled", color: "pink" },
       ],
     },
   },
@@ -276,15 +277,21 @@ async function main(): Promise<number> {
   // Orders: backfill any props the live database is missing (idempotent add).
   {
     const current = await client.dataSources.retrieve({ data_source_id: ordersDs });
-    const missing = Object.entries(ORDERS_PROPERTIES).filter(([name]) => !current.properties[name]);
-    if (missing.length > 0) {
-      const merged: Record<string, unknown> = { ...current.properties };
-      for (const [name, def] of Object.entries(ORDERS_PROPERTIES)) {
-        if ("select" in def || "checkbox" in def) merged[name] = def;
-        else if (!merged[name]) merged[name] = def;
+    const merged: Record<string, unknown> = { ...current.properties };
+    const touched: string[] = [];
+    for (const [name, def] of Object.entries(ORDERS_PROPERTIES)) {
+      if ("select" in def || "checkbox" in def) {
+        // Select options evolve with features (e.g. Cancelled) — merge idempotently.
+        if (JSON.stringify(merged[name]) !== JSON.stringify(def)) touched.push(name);
+        merged[name] = def;
+      } else if (!merged[name]) {
+        merged[name] = def;
+        touched.push(name);
       }
+    }
+    if (touched.length > 0) {
       await client.dataSources.update({ data_source_id: ordersDs, properties: merged as never });
-      check("Orders schema backfilled", true, missing.map(([n]) => n).join(", "));
+      check("Orders schema backfilled", true, touched.join(", "));
     } else {
       check("Orders schema up to date", true);
     }

@@ -56,14 +56,20 @@ Structure:
 Tiffin Butler (page)
 ├── Orders (database)
 ├── Run Log (database)
+├── Menu (database)
 └── Inbox (page)
 ```
+
+> You don't have to build any of this by hand: `npm run bootstrap` creates the
+> whole structure — including this Home page layout, the Menu schema + seed
+> items, and the Needs You view — idempotently. This guide documents what it
+> builds so you can also do it manually or verify it.
 
 Create it:
 
 1. In the sidebar, click **+ New page** → name it `Tiffin Butler`.
 2. Inside it, type `/database`, choose **Table** or **Board** view → name it `Orders`.
-3. Repeat for `Run Log`.
+3. Repeat for `Run Log` and `Menu`.
 4. Type `/page` → name it `Inbox`.
 
 ---
@@ -78,14 +84,17 @@ Create exactly these properties (name matters — the code auto-detects them):
 |---|---|---|
 | `Summary` | Title (this is the default first column — rename it) | Human author fills `Customer — items` e.g. `Priya — 2× Idli set + 1× Dosa` |
 | `Status` | Select | `New`, `Draft`, `Pending Approval`, `Needs Human`, `Confirmed`, `Rejected`, `Action Failed` |
+| `Channel` | Text | Where the order came from: `webhook`, `inbox`, `whatsapp` |
 | `Customer` | Text |    |
 | `Phone` | Text | Mobile number |
+| `Customer Email` | Text | Parsed or provided email — the receipt goes here |
+| `Action Sent` | Checkbox | Ticked by code after the receipt/decline email — makes the watcher idempotent |
 | `Items` | Text | Readable line items, e.g. `2× Idli set (₹40) · 1× Dosa (₹60)` |
 | `Total` | Number | Format: **Currency ₹** |
 | `Delivery` | Date | Pickup/delivery date (optionally time) |
 | `Room` | Text | Hostel room / block, if any |
 | `AI Summary` | Text | One short human-readable line of reasoning from the AI |
-| `Raw Message` | Text | The original customer message, preserved forever |
+| `Raw Message` | Text | The original customer message (or voice transcript), preserved forever |
 | `Confidence` | Select | `high`, `low` |
 | `Language` | Text | Detected language |
 | `Priority` | Select | `normal`, `urgent` |
@@ -114,8 +123,8 @@ Open **Run Log** → **Properties** and create:
 |---|---|---|
 | `Run` | Title (rename the default first column) | e.g. `webhook · processInbox · 13:04:22` |
 | `Timestamp` | Date | Written by code from the server clock |
-| `Trigger` | Select | `webhook`, `cron`, `manual`, `health` |
-| `Job` | Text | e.g. `processInbox`, `approvalWatcher`, `healthCheck` |
+| `Trigger` | Select | `webhook`, `cron`, `manual`, `health`, `whatsapp`, `voice` |
+| `Job` | Text | e.g. `processInbox`, `approvalWatcher`, `healthCheck`, `dailyDigest` |
 | `Outcome` | Select | `success`, `failed`, `skipped`, `duplicate`, `needs_human`, `action` |
 | `Duration` | Number | Milliseconds the run took |
 | `Error` | Text | Error summary if it failed |
@@ -127,7 +136,26 @@ To add the Relation property: ⚙️ **Properties** → **Add property** → typ
 
 ---
 
-## 6. Inbox page
+## 6. Menu database
+
+The live menu the pricer uses. **Notion is the source of truth**: change a
+price here and every new order is priced at the new rate (~60s cache) — no
+code deploy needed.
+
+| Property name | Type | Notes |
+|---|---|---|
+| `Item` | Title (rename the default first column) | e.g. `Idli set` |
+| `Price` | Number | Format: **Currency ₹** |
+| `Aliases` | Text | Comma-separated alternate spellings customers use, e.g. `idli plate, idlies` |
+| `Available` | Checkbox | Untick to take an item off the menu without deleting it |
+
+Bootstrap creates this database and seeds the core items **add-only** — after
+the first seed, your edits are never overwritten; re-running bootstrap only
+adds items that are missing entirely.
+
+---
+
+## 7. Inbox page
 
 A page where anyone can paste a stray WhatsApp message for the service to
 process (the watcher picks it up automatically — this makes Notion a *usable*
@@ -144,7 +172,7 @@ input channel, not just an output).
 
 ---
 
-## 7. Share everything with the integration
+## 8. Share everything with the integration
 
 This is the step people forget — the token is useless until the integration is
 granted access.
@@ -153,23 +181,25 @@ granted access.
 2. Click **•••** (top right) → **Connections**.
 3. In the search box, type your integration name **Tiffin Butler** → click it to
    add.
-4. Repeat for **Orders**, **Run Log**, and **Inbox** individually if they are not
+4. Repeat for **Orders**, **Run Log**, **Menu**, and **Inbox** individually if they are not
    already covered (children inherit when shared via the parent, but double-check
    each database's **Connections** menu shows `Tiffin Butler`).
 
 ---
 
-## 8. Home page content (what a stranger reads first)
+## 9. Home page content (what a stranger reads first)
 
-Put these blocks at the top of the **Tiffin Butler** page so anyone — judge,
-replacement owner, teammate — understands the system in 30 seconds.
+`npm run bootstrap` builds this for you — an icon + cover, a one-line pitch, a
+"How it works" callout, live links to Orders / Run Log / Inbox / Menu, a stats
+line refreshed by the hourly health ping, and a bookmark to the deployed
+service. If you prefer building it manually, cover the same beats:
 
 ```
 📦 TIFFIN BUTLER — WhatsApp order intake, run by code
 
 How it works
-· A customer's message arrives (webhook, cron scan, or pasted in Inbox).
-· Code parses it with AI, prices it, and creates an order draft.
+· A customer's message arrives — webhook, WhatsApp text/voice, or pasted in Inbox.
+· Code transcribes voice notes (Whisper), parses with AI, prices from the Menu database.
 · The owner reviews it: Approve / Edit / Reject — all in Notion.
 · On approval, code emails the customer a confirmation + PDF receipt.
 · Every run is logged in the Run Log database with a timestamp.
@@ -183,12 +213,13 @@ Status legend
 
 Who does what
 · The owner reads/should decide via the "Needs You" view.
+· Menu prices are edited right here in the Menu database.
 · The code writes Run Log rows and status transitions — never hand-edit the Run Log.
 ```
 
 ---
 
-## 9. Verify your setup
+## 10. Verify your setup
 
 Everything here is code-verifiable. From the repo root:
 
@@ -203,17 +234,18 @@ The script prints:
 - ✅ / ❌ integration token found
 - ✅ / ❌ `Orders` database resolved (by title) — shows its id
 - ✅ / ❌ `Run Log` database resolved — shows its id
-- ✅ / ❌ each required property present on both databases (missing ones listed)
+- ✅ / ❌ `Menu` database resolved — shows its id
+- ✅ / ❌ each required property present on all three databases (missing ones listed)
 
 **Expected output when done:** all checks pass. If a property is missing, add it
 in Notion exactly as named in the tables above and re-run.
 
 > If a check fails on "database not found": the integration was not shared with
-> it (Section 7) — not the script's fault, that's the #1 cause.
+> it (Section 8) — not the script's fault, that's the #1 cause.
 
 ---
 
-## 10. Done — what Day 1 leaves you with
+## 11. Done — what Day 1 leaves you with
 
 - A workspace a stranger can read and operate (`Tiffin Butler` home page)
 - An integration token in `.env` (never in the repo)

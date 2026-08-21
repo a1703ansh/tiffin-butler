@@ -44,9 +44,10 @@ human operator per message.
 ```
                  ┌─────────────────────────────── Notion (interface) ───────┐
  customer text ──► webhook/order ─┐                                        │
- pasted in Inbox ─► cron/process ─┼─► AI parse ─► price ─► dedupe          │
-                                  │      (Groq)   │        │               │
- cron-job.org ──► /cron/process ──┘               ▼        ▼               │
+ voice note ─────► webhook/voice ─┤                                        │
+ pasted in Inbox ─► cron/process ─┼─► Whisper ─► AI parse ─► price ─► dedupe
+ WhatsApp text/voice ► /webhook/  │  (voice)    (Groq)      │        │      │
+ cron-job.org ──► /cron/process ──┘            ▼           ▼        ▼      │
    (every min)                  ┌──────── order: Pending Approval / Needs Human
                                 ▼                                        │
               human in Notion:  Confirmed ─► email + PDF receipt         │
@@ -54,6 +55,8 @@ human operator per message.
                                 fail       ─► Action Failed + Run Log row│
                                 │                                        │
                                 └──► Run Log row for every run ◄─────────┘
+
+ Menu database (owner-edited prices) feeds the pricer; daily digest emails the owner.
 ```
 
 ## Stack
@@ -125,6 +128,7 @@ Database and page IDs are never hard-coded — everything resolves by title
 - `docs/setup-notion.md` — workspace design, schema, views, guide
 - `docs/deploy.md` — Render + cron-job.org deployment
 - `docs/demo-script.md` — the 5-minute judging walkthrough
+- `docs/whatsapp.md` — Meta Cloud API day-of setup (text + voice intake)
 
 ## Repo layout
 

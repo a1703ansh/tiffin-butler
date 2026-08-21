@@ -36,6 +36,11 @@ render.com with GitHub).
    WHATSAPP_REPLIES=false
    ```
 
+   Optional overrides (sane defaults, usually omitted):
+   `WHISPER_MODEL=whisper-large-v3` (voice-note transcription model) and
+   `NOTION_MENU_DB_ID` / `NOTION_ORDERS_DB_ID` / `NOTION_RUN_LOG_DB_ID` /
+   `NOTION_INBOX_PAGE_ID` (hard ids instead of title resolution).
+
    About email on Render: the free Resend sandbox (`onboarding@resend.dev`)
    can only deliver to the account owner's verified inbox — so in
    `EMAIL_DELIVERY=sandbox` mode every receipt/decline goes to `EMAIL_TO`
@@ -93,12 +98,19 @@ npm run build      # tsc -> dist/
 npm start          # run the compiled output
 ```
 
-Local smoke test:
+Local smoke tests:
 
 ```powershell
+# Text order
 Invoke-RestMethod -Method Post -Uri http://localhost:3000/webhook/order `
   -ContentType 'application/json' `
   -Body '{"text":"2 idli sets + 1 dosa tomoro 8am room 204"}'
+
+# Voice note (ogg/m4a/mp3/wav up to 25MB) — Whisper transcribes, then same pipeline
+curl.exe -s -X POST http://localhost:3000/webhook/voice -F "file=@samples/audio sample.ogg;type=audio/ogg"
+
+# Evening digest (also safe to trigger manually)
+curl.exe http://localhost:3000/cron/digest
 ```
 
 ## Slots summary

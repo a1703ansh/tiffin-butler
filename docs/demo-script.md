@@ -65,7 +65,22 @@ nothing) and the Run Log shows `cron · approvalWatcher · action`.
   the order to Action Failed with the Run Log row explaining why — the
   automation reports its own failures instead of hiding them.
 
-### 6. Close (30s)
+### 6. The showstopper: a voice note becomes an order (45s)
+On your phone, record a voice note the way a real customer would:
+> “bhaiya, kal do idli set aur ek dosa chahiye, room 214”
+
+Upload it straight into the pipeline — no WhatsApp needed:
+```bash
+curl -X POST https://tiffin-butler.onrender.com/webhook/voice -F file=@note.m4a
+```
+The response shows what Whisper heard, and Notion shows the parsed, priced,
+Pending Approval order. Same AI, same rules, one extra step: audio → text.
+
+Bonus beat: open the **Menu** database on Home and change Dosa ₹60 → ₹65 live;
+the next order prices at the new rate. *The owner runs this business from
+Notion — prices included.*
+
+### 7. Close (30s)
 Run Log is full of rows from Day 1 onward — timestamps prove the system ran
 without anyone touching it. And the whole workspace is re-creatable: the repo
 builds it idempotently (`npm run bootstrap` + `npm run check-setup`) on any
@@ -78,29 +93,32 @@ title.
 
 | Criterion | Where it's proven |
 |---|---|
-| Notion is the interface | owner decides entirely in Notion (Needs You view); Run Log lives in Notion |
+| Notion is the interface | owner decides entirely in Notion (Needs You view); Run Log lives in Notion; Menu is owner-editable in Notion |
 | Code is the engine | API-accessed databases, AI parse, pricing, dedupe, watcher, emails — no no-code platform |
-| Real action outside Notion | customer emails with PDF receipts via Resend + pdf-lib |
+| Real action outside Notion | customer emails with PDF receipts via Resend + pdf-lib; daily owner digest |
 | Human approval | nothing sends without a human moving Status to Confirmed |
-| Run Log proof | rows written by code since Day 1 across webhook/cron/health/watcher |
+| Run Log proof | rows written by code since Day 1 across webhook/cron/health/watcher/voice/digest |
 | Portability | `npm run bootstrap` re-creates the workspace anywhere; IDs resolve by title |
-| AI vs rules | AI only for messy text parsing; pricing/dedupe are plain functions |
+| AI vs rules | AI for messy text + voice transcription; pricing/dedupe are plain functions |
 
 ## Likely judge questions — 1-line answers
 
 - **“Why tiffin?”** Delivery apps skip the mess market — daily cadence, tiny
   margins, chaotic WhatsApp orders. Perfect automation demo, real business.
-- **“Why not the WhatsApp Business API?”** Meta's official API is heavy for a
-  hackathon; the demo uses webhook + Inbox as the intake, so swapping
-  WhatsApp later is a one-line integration.
+- **“Does it do real WhatsApp?”** Yes — Meta Cloud API integration is built and
+  dormant: text *and* voice notes. It's activated with four env vars on demo
+  day (docs/whatsapp.md); today's demo uses the same pipeline via webhook.
 - **“Why an LLM at all?”** Because the input is unbounded human text in
   Hinglish (“tomoro”, “kal”, “parso”). If-statements can't parse that; they
   *can* price and dedupe — so that's where they live.
+- **“What if the AI mishears a voice note?”** Same safety net as text: fuzzy
+  menu matching first, and anything uncertain goes to Needs Human with the
+  transcript preserved — never silently priced.
 - **“Is it actually running?”** Run Log has rows since Day 1, plus
   tiffin-butler.onrender.com is served by this repo's code; cron-job.org pings
-  it every minute.
-- **“Where does the money come from?”** Free tiers end-to-end: Groq, Resend
-  sandbox, Render, cron-job.org.
+  it every minute and emails the owner a digest every evening.
+- **“Where does the money come from?”** Free tiers end-to-end: Groq (chat +
+  Whisper), Resend sandbox, Render, cron-job.org.
 - **“Can it send to real customers?”** Yes — verify a domain in Resend and set
   `EMAIL_DELIVERY=customer`; the sandbox demo mode (default) delivers to the
   owner's inbox with the customer's parsed address in the subject.

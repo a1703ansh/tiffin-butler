@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { env } from "../config.js";
 import { business } from "../business.config.js";
+import type { LoadedMenu } from "../menu.js";
 
 export const parsedOrderSchema = z.object({
   customerName: z.string().nullable().optional(),
@@ -28,13 +29,17 @@ export class ParseError extends Error {
   }
 }
 
-function buildPrompt(raw: string): { system: string; user: string } {
+function buildPrompt(raw: string, menu: LoadedMenu): { system: string; user: string } {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: business.timezone });
-  const menuNames = business.menu.map((m) => m.name).join(", ");
+  const menuNames = menu.entries.map((m) => m.name).join(", ");
+  const menuNote =
+    menu.source === "notion"
+      ? `Menu the business offers (live from Notion): ${menuNames}.`
+      : `Menu the business offers: ${menuNames}.`;
 
   const system = [
     `You extract order details from a customer's WhatsApp-style message for a tiffin/mess service in India.`,
-    `Menu the business offers: ${menuNames}.`,
+    menuNote,
     `Today's date is ${today} (${business.timezone}).`,
     `Rules:`,
     `- Return ONLY one JSON object. No markdown, no commentary.`,
@@ -67,10 +72,10 @@ function extractJson(content: string): string {
 }
 
 /** AI reads the messy message and returns a validated structured order. */
-export async function parseOrder(raw: string): Promise<ParsedOrder> {
+export async function parseOrder(raw: string, menu?: LoadedMenu): Promise<ParsedOrder> {
   if (!env.llmApiKey) throw new ParseError("LLM_API_KEY is not set", "not_configured");
 
-  const { system, user } = buildPrompt(raw);
+  const { system, user } = buildPrompt(raw, menu ?? { entries: business.menu.map((m) => ({ name: m.name, aliases: [...m.aliases], price: m.price })), source: "config" });
 
   let res: Response;
   try {

@@ -64,7 +64,11 @@ render.com with GitHub).
    - Name: `tiffin-butler health`
    - URL: `https://tiffin-butler.onrender.com/cron/health`
    - Schedule: `0 * * * *` (hourly)
-4. Enable both jobs.
+4. Create a third job:
+   - Name: `tiffin-butler digest`
+   - URL: `https://tiffin-butler.onrender.com/cron/digest`
+   - Schedule: `30 15 * * *` (15:30 UTC = 21:00 IST daily — evening owner digest)
+5. Enable all three jobs.
 
 ## 3. Verify it runs without you
 
@@ -102,6 +106,8 @@ Invoke-RestMethod -Method Post -Uri http://localhost:3000/webhook/order `
 | Endpoint | Called by | What it does |
 |---|---|---|
 | `POST /webhook/order` | inbound messages (any sender) | Intake one order message |
-| `GET/POST /webhook/whatsapp` | Meta Cloud API (day-of setup, docs/whatsapp.md) | WhatsApp webhook handshake + intake |
+| `POST /webhook/voice` | audio uploads (`curl -F file=@note.m4a …`) | Whisper transcribe → same intake pipeline |
+| `GET/POST /webhook/whatsapp` | Meta Cloud API (day-of setup, docs/whatsapp.md) | WhatsApp webhook handshake + text/voice intake |
 | `GET /cron/process` | cron-job.org every minute | Scan Inbox page + approval watcher |
 | `GET /cron/health` | cron-job.org hourly | Heartbeat row → proof spread across days |
+| `GET /cron/digest` | cron-job.org daily 21:00 IST | Owner digest email + Run Log row |

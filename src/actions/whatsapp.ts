@@ -37,3 +37,36 @@ export async function replyToWhatsApp(
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/**
+ * Downloads an inbound media file (voice notes arrive as audio messages) via
+ * Meta's Media API. Dormant-safe like the rest of the WhatsApp integration.
+ */
+export async function downloadWhatsAppMedia(
+  mediaId: string,
+): Promise<{ ok: true; buffer: Buffer; mime: string } | { ok: false; error: string }> {
+  if (!env.whatsappAccessToken) return { ok: false, error: "WHATSAPP_ACCESS_TOKEN is not set" };
+
+  try {
+    const meta = await fetch(`${env.whatsappGraphUrl}/${mediaId}`, {
+      headers: { Authorization: `Bearer ${env.whatsappAccessToken}` },
+    });
+    if (!meta.ok) {
+      const detail = (await meta.text()).slice(0, 300);
+      return { ok: false, error: `Media lookup HTTP ${meta.status}: ${detail}` };
+    }
+    const info = (await meta.json()) as { url?: string; mime_type?: string };
+    if (!info.url) return { ok: false, error: "media metadata returned no url" };
+
+    const bin = await fetch(info.url, {
+      headers: { Authorization: `Bearer ${env.whatsappAccessToken}` },
+    });
+    if (!bin.ok) {
+      return { ok: false, error: `Media download HTTP ${bin.status}` };
+    }
+    const buf = Buffer.from(await bin.arrayBuffer());
+    return { ok: true, buffer: buf, mime: info.mime_type ?? "audio/ogg" };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

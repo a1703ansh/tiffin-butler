@@ -76,6 +76,15 @@ export async function sendReceiptEmail(order: OrderEmail): Promise<EmailResult> 
   }).then((r) => (r.ok ? { ok: true, to } : r));
 }
 
+/** Daily owner digest — always to the owner's inbox (EMAIL_TO). */
+export async function sendDigestEmail(subject: string, html: string): Promise<EmailResult> {
+  if (!env.resendApiKey) {
+    return { ok: false, error: "RESEND_API_KEY is not set — email disabled" };
+  }
+  const r = await resendSend({ from: env.emailFrom, to: env.emailTo, subject, html });
+  return r.ok ? { ok: true, to: env.emailTo } : { ok: false, error: r.error };
+}
+
 /** Rejected order → short decline email (no receipt). */
 export async function sendRejectionEmail(order: OrderEmail): Promise<EmailResult> {
   const { to, customerNote } = deliveryRecipient(order);

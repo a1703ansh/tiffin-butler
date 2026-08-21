@@ -5,6 +5,7 @@ import { parseOrder, ParseError } from "../ai/parseOrder.js";
 import { formatLineItems, priceItems, type LineItem } from "../pricing.js";
 import { findOrderByFingerprint, orderFingerprint } from "../dedupe.js";
 import { business } from "../business.config.js";
+import { loadMenu } from "../menu.js";
 
 export type ProcessResult = {
   status: "created" | "skipped" | "duplicate" | "needs_human";
@@ -99,10 +100,13 @@ export async function processMessage(
 
   const source = channel ?? (trigger === "cron" ? "inbox" : trigger);
 
+  // 0. Live menu from Notion (owner-editable; config fallback on failure)
+  const menu = await loadMenu();
+
   // 1. AI parse (messy text -> structured order)
   let parsed;
   try {
-    parsed = await parseOrder(text);
+    parsed = await parseOrder(text, menu);
   } catch (err) {
     const reason = err instanceof ParseError ? err.message : String(err);
     const orderId = await createOrder({
@@ -139,7 +143,7 @@ export async function processMessage(
   }
 
   // 3. Price it (rules, not AI)
-  const pricing = priceItems(parsed.items);
+  const pricing = priceItems(parsed.items, menu.entries);
   const needsHuman =
     parsed.confidence === "low" ||
     pricing.unknownItems.length > 0 ||

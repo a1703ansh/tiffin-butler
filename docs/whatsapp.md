@@ -45,11 +45,26 @@ endpoints answer "WhatsApp not configured", and nothing else changes.
 
 1. WhatsApp the test number from one of the recipient phones: *"2 idli and 1
    dosa kal 8am room 204"*.
-2. Within seconds: `whatsapp · processInbox · <time>` in the Run Log, the
-   order in **Orders** at **Pending Approval**, `Channel` = `whatsapp`.
+2. Within seconds: `whatsapp · processInbox · <time>` in the Run Log, the order
+   in **Orders** at **Pending Approval**, `Channel` = `whatsapp`.
 3. Approve it in Notion — the receipt email flows exactly like webhook orders.
 4. With `WHATSAPP_REPLIES=true` the customer gets a free-form reply (allowed
    inside the 24h window opened by their message).
+
+### Voice notes work automatically
+
+Send a **voice note** instead of text and the same flow runs: the webhook
+downloads the audio via Meta's Media API, transcribes it with Whisper (Groq,
+same key as the chat model), and parses the transcript with the normal
+pipeline. Nothing extra to configure. The exact transcribe step is testable
+without Meta at any time:
+
+```bash
+curl -X POST https://tiffin-butler.onrender.com/webhook/voice -F file=@note.m4a
+```
+
+If a voice note can't be transcribed (empty audio, API hiccup), a Run Log
+`failed` row records why and no junk order is created.
 
 ## Troubleshooting
 

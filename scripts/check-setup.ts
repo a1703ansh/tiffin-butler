@@ -45,11 +45,18 @@ const REQUIRED_RUN_LOG: Record<string, PropertyKind> = {
   Order: "relation",
 };
 
+const REQUIRED_MENU: Record<string, PropertyKind> = {
+  Item: "title",
+  Price: "number",
+  Aliases: "rich_text",
+  Available: "checkbox",
+};
+
 const REQUIRED_SELECT_OPTIONS = {
   Status: ["New", "Draft", "Pending Approval", "Needs Human", "Confirmed", "Rejected", "Action Failed"],
   Confidence: ["high", "low"],
   Priority: ["normal", "urgent"],
-  Trigger: ["webhook", "cron", "manual", "health", "whatsapp"],
+  Trigger: ["webhook", "cron", "manual", "health", "whatsapp", "voice"],
   Outcome: ["success", "failed", "skipped", "duplicate", "needs_human", "action"],
 } as const;
 
@@ -88,7 +95,12 @@ async function checkDataSource(
   required: Record<string, PropertyKind>,
   requiredOptions: Record<string, readonly string[]>,
 ): Promise<void> {
-  const envKey = name === "Orders" ? "NOTION_ORDERS_DB_ID" : "NOTION_RUN_LOG_DB_ID";
+  const envKey =
+    name === "Orders"
+      ? "NOTION_ORDERS_DB_ID"
+      : name === "Menu"
+        ? "NOTION_MENU_DB_ID"
+        : "NOTION_RUN_LOG_DB_ID";
   const envId = process.env[envKey];
   const id = await resolveDataSource(client, name, envId);
 
@@ -149,6 +161,12 @@ async function main(): Promise<number> {
     await checkDataSource(client, "Run Log", REQUIRED_RUN_LOG, REQUIRED_SELECT_OPTIONS);
   } catch (err) {
     fail("Run Log check crashed", err instanceof Error ? err.message : String(err));
+  }
+
+  try {
+    await checkDataSource(client, "Menu", REQUIRED_MENU, REQUIRED_SELECT_OPTIONS);
+  } catch (err) {
+    fail("Menu check crashed", err instanceof Error ? err.message : String(err));
   }
 
   console.log("");

@@ -18,6 +18,7 @@ import "dotenv/config";
 import { Client, type DatabaseObjectResponse, type DataSourceObjectResponse, type PageObjectResponse } from "@notionhq/client";
 import type { PropertyConfigurationRequest } from "@notionhq/client/build/src/api-endpoints/common.js";
 import { HOME_V2_MARKER, STATS_MARKER } from "../src/notion/constants.js";
+import { business } from "../src/business.config.js";
 
 function rt(text: string) {
   return { type: "text" as const, text: { content: text } };
@@ -90,6 +91,7 @@ const RUN_LOG_PROPERTIES: Record<string, PropertyConfigurationRequest> = {
         { name: "manual", color: "green" },
         { name: "health", color: "pink" },
         { name: "whatsapp", color: "green" },
+        { name: "voice", color: "purple" },
       ],
     },
   },
@@ -110,6 +112,13 @@ const RUN_LOG_PROPERTIES: Record<string, PropertyConfigurationRequest> = {
   Duration: { type: "number", number: { format: "number" } },
   Error: { type: "rich_text", rich_text: {} },
   Meta: { type: "rich_text", rich_text: {} },
+};
+
+const MENU_PROPERTIES: Record<string, PropertyConfigurationRequest> = {
+  Item: { type: "title", title: {} },
+  Price: { type: "number", number: { format: "rupee" } },
+  Aliases: { type: "rich_text", rich_text: {} },
+  Available: { type: "checkbox", checkbox: {} },
 };
 
 const HOME_COVER_URL =
@@ -330,11 +339,12 @@ async function main(): Promise<number> {
 
   // 4. Inbox page
   const existingInbox = await findPageByTitle(client, "Inbox");
+  let inboxPageId = "";
   if (!existingInbox) {
     const created = await client.pages.create({
       parent: { type: "page_id", page_id: homeId },
       properties: { title: { title: rtArray("Inbox") } },
-      icon: { type: "emoji", emoji: "📥" },
+      icon: { type: "emoji", emoji: "\uD83D\uDCE5" },
       content: [
         {
           object: "block",
@@ -345,10 +355,12 @@ async function main(): Promise<number> {
         },
       ],
     });
+    inboxPageId = created.id;
     check("Inbox page created", true, created.id.slice(0, 8) + "\u2026");
   } else {
+    inboxPageId = existingInbox;
     check("Inbox page exists", true, existingInbox.slice(0, 8) + "\u2026");
-    await client.pages.update({ page_id: existingInbox, icon: { type: "emoji", emoji: "📥" } });
+    await client.pages.update({ page_id: existingInbox, icon: { type: "emoji", emoji: "\uD83D\uDCE5" } });
   }
 
   // 5. Home page dressing: icon + cover.
@@ -400,11 +412,119 @@ async function main(): Promise<number> {
     check("home page already v2, skipped", true);
   }
 
+  // 7. Menu database — the owner edits items/prices here; the engine reads it per order.
+  let menuDs = await findDataSourceByTitle(client, "Menu");
+  if (!menuDs) {
+    const created = await client.databases.create({
+      parent: { type: "page_id", page_id: homeId },
+      title: rtArray("Menu"),
+      initial_data_source: { properties: MENU_PROPERTIES },
+    });
+    const full = await client.databases.retrieve({ database_id: created.id });
+    menuDs = ((full as DatabaseObjectResponse).data_sources ?? [])[0]?.id ?? null;
+    if (!menuDs) menuDs = await findDataSourceByTitle(client, "Menu");
+    check("Menu database created", Boolean(menuDs), menuDs ? menuDs.slice(0, 8) + "\u2026" : "data source id not found after creation");
+  } else {
+    check("Menu database exists", true, menuDs.slice(0, 8) + "\u2026");
+  }
+  if (!menuDs) return 1;
+
+  // Menu: backfill any missing props (idempotent add).
+  {
+    const current = await client.dataSources.retrieve({ data_source_id: menuDs });
+    const missing = Object.entries(MENU_PROPERTIES).filter(([name]) => !current.properties[name]);
+    if (missing.length > 0) {
+      const merged: Record<string, unknown> = { ...current.properties };
+      for (const [name, def] of Object.entries(MENU_PROPERTIES)) {
+        if ("checkbox" in def || !merged[name]) merged[name] = def;
+      }
+      await client.dataSources.update({ data_source_id: menuDs, properties: merged as never });
+      check("Menu schema backfilled", true, missing.map(([n]) => n).join(", "));
+    } else {
+      check("Menu schema up to date", true);
+    }
+  }
+
+  // Menu: seed the core items (add-only — creates missing items, never
+  // overwrites owner edits; after first seed Notion is the source of truth).
+  {
+    const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+    const existing = new Set<string>();
+    let cursor: string | undefined;
+    do {
+      const res = await client.dataSources.query({
+        data_source_id: menuDs,
+        page_size: 100,
+        ...(cursor ? { start_cursor: cursor } : {}),
+      });
+      for (const page of res.results) {
+        if (!("properties" in page)) continue;
+        const props = page.properties as Record<string, { type?: string } & Record<string, unknown>>;
+        const itemProp = props["Item"] as { type?: string; title?: Array<{ plain_text?: string }> } | undefined;
+        const name = itemProp?.type === "title" ? (itemProp.title ?? []).map((t) => t.plain_text ?? "").join("").trim() : "";
+        if (name) existing.add(norm(name));
+      }
+      cursor = res.has_more ? res.next_cursor ?? undefined : undefined;
+    } while (cursor);
+
+    let added = 0;
+    for (const item of business.menu) {
+      if (existing.has(norm(item.name))) continue;
+      await client.pages.create({
+        parent: { data_source_id: menuDs },
+        properties: {
+          Item: { title: rtArray(item.name) },
+          Price: { number: item.price },
+          Aliases: { rich_text: [rt(item.aliases.join(", "))] },
+          Available: { checkbox: true },
+        } as never,
+      });
+      added += 1;
+    }
+    check("Menu items ensured", true, `${business.menu.length} core items (${added} added)`);
+  }
+
+  // 8. Home: a Menu card next to the Live systems links.
+  {
+    const menuFull = (await client.dataSources.retrieve({ data_source_id: menuDs })) as unknown as {
+      parent?: { type?: string; database_id?: string };
+    };
+    const parent = menuFull.parent ?? {};
+    const menuDbBlockId = parent.type === "database_id" ? parent.database_id ?? "" : "";
+
+    const kids = await client.blocks.children.list({ block_id: homeId, page_size: 100 });
+    let hasLink = false;
+    let inboxLinkId = "";
+    for (const b of kids.results) {
+      if (!("type" in b) || b.type !== "link_to_page") continue;
+      const lp = b.link_to_page as { type?: string; database_id?: string; page_id?: string };
+      if (lp.type === "database_id" && menuDbBlockId && lp.database_id === menuDbBlockId) hasLink = true;
+      if (lp.type === "page_id" && inboxPageId && (lp.page_id ?? "").replace(/-/g, "") === inboxPageId.replace(/-/g, "")) inboxLinkId = b.id;
+    }
+
+    if (hasLink || !menuDbBlockId) {
+      check("home 'Live systems' Menu card present", hasLink, hasLink ? "" : "menu db block id unavailable");
+    } else {
+      try {
+        await client.blocks.children.append({
+          block_id: homeId,
+          children: [block("link_to_page", { database_id: menuDbBlockId })] as never,
+          ...(inboxLinkId ? { after: inboxLinkId } : {}),
+        });
+        check("home 'Live systems' Menu card added", true, inboxLinkId ? "after Inbox link" : "appended");
+      } catch {
+        await client.blocks.children.append({
+          block_id: homeId,
+          children: [block("link_to_page", { database_id: menuDbBlockId })] as never,
+        });
+        check("home 'Live systems' Menu card added", true, "appended at end");
+      }
+    }
+  }
+
   console.log("");
-  console.log("Bootstrap done. Two manual touches (2 minutes, see guide section 4-5):");
-  console.log("  1. Orders: add a board view grouped by Status.");
-  console.log("  2. Orders: add a 'Needs You' view filtered to Pending Approval / Needs Human / Action Failed.");
-  console.log("Then verify with: npm run check-setup");
+  console.log("Bootstrap done. Verify with: npm run check-setup");
+  console.log("Menu is owner-editable in Notion — price changes apply to the next order within ~60s.");
   return 0;
 }
 

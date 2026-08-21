@@ -20,9 +20,11 @@ human operator per message.
 
 ## What the system does
 
-1. An order message arrives — webhook, a paste into the Inbox page, anything.
-2. **AI (Groq)** parses the messy text into structured JSON: customer, phone,
+1. An order message arrives — **WhatsApp text or voice note**, webhook, or a
+   paste into the Inbox page.
+2. **AI (Groq)** parses the messy input into structured JSON: customer, phone,
    email, items, relative dates (“kal” → tomorrow), room, language, confidence.
+   Voice notes are transcribed first (**Whisper**), then parsed the same way.
 3. **Rules, not AI** — price it against the menu, fingerprint it for duplicates.
 4. Clean orders land at **Pending Approval**; anything unclear lands at
    **Needs Human** with the raw message preserved.
@@ -33,6 +35,9 @@ human operator per message.
    (checkbox) makes it idempotent under the 1-minute cron.
 7. Every run — webhook, cron scan, health heartbeat, watcher action — gets a
    row in the **Run Log** database, written by code alone.
+8. The **Menu database** lives in Notion: the owner edits items/prices there,
+   and every new order is priced against it (~60s cache). A daily evening
+   digest emails the owner today's orders, revenue, and anything stuck.
 
 ## Architecture
 
@@ -98,8 +103,11 @@ Run Log outcomes: `success` · `needs_human` · `duplicate` · `action` · `fail
 | Endpoint | When | What it does |
 |---|---|---|
 | `POST /webhook/order` | an inbound message | intake (AI → price → dedupe → create) |
+| `POST /webhook/voice` | an audio upload (or Meta voice note on demo day) | Whisper transcribe → same intake |
+| `GET/POST /webhook/whatsapp` | Meta Cloud API (dormant until envs set) | handshake + WhatsApp text/voice intake |
 | `GET /cron/process` | every minute | scan Inbox page + run approval watcher |
 | `GET /cron/health` | hourly | heartbeat → Run Log proof spread across days |
+| `GET /cron/digest` | daily 21:00 IST | owner digest email: orders, revenue, stuck items |
 
 ## Portability (“delete the repo and run it on a friend's Notion”)
 
@@ -109,7 +117,8 @@ Database and page IDs are never hard-coded — everything resolves by title
 1. share their workspace with an internal integration,
 2. `cp .env.example .env` + a fresh `NOTION_TOKEN`,
 3. `npm run bootstrap && npm run check-setup`,
-4. swap `src/business.config.ts` (menu + prices) and deploy.
+4. deploy — bootstrap seeds the Menu database; the owner then edits
+   items/prices directly in Notion (no code deploys for a price change).
 
 ## Docs
 
@@ -123,16 +132,20 @@ Database and page IDs are never hard-coded — everything resolves by title
 src/
   index.ts                 Fastify server + endpoints
   config.ts                env config
-  business.config.ts       the business: menu, prices, currency, timezone
+  business.config.ts       fallback menu, currency, timezone
+  menu.ts                  live Menu loader from Notion (60s cache)
   runlog.ts                single Run Log writer
   ai/parseOrder.ts         LLM parse (zod-validated)
-  pricing.ts               menu pricing (rules)
+  ai/transcribe.ts         Whisper voice-note transcription (Groq)
+  pricing.ts               menu pricing (rules, fuzzy item matching)
   dedupe.ts                fingerprint dedupe (rules)
   jobs/processInbox.ts     intake + Inbox scan
   jobs/approvalWatcher.ts  Confirmed/Rejected → email + Action Sent
+  jobs/dailyDigest.ts      evening owner digest email
   jobs/healthCheck.ts      heartbeat
   actions/receipt.ts       pdf-lib PDF receipt
-  actions/email.ts         Resend sends (sandbox-safe delivery)
+  actions/email.ts         Resend sends (sandbox-safe delivery + digest)
+  actions/whatsapp.ts      WhatsApp replies + media download (dormant-safe)
   notion/                  client + schema helpers (data sources API)
 scripts/
   bootstrap-workspace.ts   idempotent workspace builder

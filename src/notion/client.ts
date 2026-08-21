@@ -81,6 +81,9 @@ export const getOrdersDataSource = (): Promise<string> =>
 export const getRunLogDataSource = (): Promise<string> =>
   resolveDataSource("Run Log", process.env.NOTION_RUN_LOG_DB_ID);
 
+export const getMenuDataSource = (): Promise<string> =>
+  resolveDataSource("Menu", process.env.NOTION_MENU_DB_ID);
+
 export const getInboxPage = (): Promise<string> =>
   resolvePage("Inbox", process.env.NOTION_INBOX_PAGE_ID);
 

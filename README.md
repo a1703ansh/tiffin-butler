@@ -7,7 +7,7 @@ and it becomes a priced, dated order sitting in **Notion** waiting for a human
 decision. Approve it and the customer gets a confirmation email with a PDF
 receipt. Every single run is logged. Nothing about this is no-code.
 
-> Built for the Notion hackathon: Notion is the interface, code is the engine.
+> Built for the Automate India hackathon: Notion is the interface, code is the engine.
 
 ---
 
